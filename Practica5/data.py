@@ -72,6 +72,23 @@ def mostrarImg(img):
 
 
 """
+funcion para hacer pruebas con nuestras fotos
+"""
+
+def convertirRedimensionar(imagen_path, output_path):
+    # Abrir la imagen
+    with Image.open(imagen_path) as img:
+        # Si la imagen tiene un canal alfa (transparencia), convertir a RGB
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+        
+        # Redimensionar la imagen a 200x200
+        img_resized = img.resize((200, 200))
+        
+        # Guardar la imagen en formato JPG
+        img_resized.save(output_path, 'JPEG')
+
+"""
 entrenamientoTest se encarga de dividir el dataset total en conjunto de entrenamiento y test
 """
 
