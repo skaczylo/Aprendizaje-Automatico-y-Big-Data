@@ -1,8 +1,10 @@
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 import torch
+import torch.optim as optim
 
 """
+Esta clase contiene 3 modelos uno para cada atributo y entrena los 3 modelos a la vez para optimizar el tiempo
 Clase Agente contiene la siguiente info:
 - Dataset
 - Modelo de la red que se quiera entrenar
@@ -18,64 +20,82 @@ Ademas contiene los metodos:
 
 class Agente:
 
-    def __init__(self,dataset,modelo,device, epoch, criterio, optimizador):
+    def __init__(self,modeloEdad,modeloGenero, modeloRaza, criterioEdad, criterioGenero, criterioRaza, device, epochs,lr):
 
         #Datos principales
-        self.dataset = dataset #Dataset
-        self.modelo = modelo #Red neuronal
         self.device = device #CPU o GPU depende del ordenador
+        self.epochs = epochs
+        self.lr = lr
+
+        #Modelo edad
+        self.modeloEdad= modeloEdad #Red neuronal para la edad
+        self.criterioEdad = criterioEdad
+        self.optimizadorEdad = optim.Adam(self.modeloEdad.parameters(), lr=self.lr )
+
+        #Modelo  genero
+        self.modeloGenero= modeloGenero #Red neuronal para la edad
+        self.criterioGenero = criterioGenero
+        self.optimizadorGenero = optim.Adam(self.modeloGenero.parameters(), lr=self.lr )
+
+        #Modelo raza
+        self.modeloRaza= modeloRaza #Red neuronal para la edad
+        self.criterioRaza = criterioRaza
+        self.optimizadorRaza = optim.Adam(self.modeloRaza.parameters(), lr=self.lr )
         
-        #Metadatos
-        self.epoch = epoch
-        self.criterio = criterio
-        self.optimizador = optimizador
 
+    def entrenarAgente(self,train_data):
 
-    def entrenamientoTest(dataset,test_size = 0.2,batch_size = 4):
-       
-        #Primero realizamos una division de  indices
-        train_indices, test_indices = train_test_split(range(len(dataset)), test_size=test_size, random_state=42)
+        for epoch in range(self.epochs):  # loop over the dataset multiple times
 
-        #Dividimos los indices
-        train_subset = torch.utils.data.Subset(dataset, train_indices)
-        test_subset = torch.utils.data.Subset(dataset, test_indices)
+            running_loss_edad = 0.0
+            running_loss_genero = 0.0
+            running_loss_raza = 0.0
 
-        # Crear los DataLoaders con los indices que hemos repartidos
-        train_dataloader = DataLoader(train_subset, batch_size=4, shuffle=True)
-        test_dataloader = DataLoader(test_subset, batch_size=4, shuffle=False)
-
-        #Dividimos ambos conjuntos en batches
-        train_dataloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        test_dataloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
-
-        return train_dataloader,test_dataloader
-    
-    def entrenarModelo(self,train_data):
-        for epoch in range(2):  # loop over the dataset multiple times
-
-            running_loss = 0.0
-            for i, data in enumerate(train_data, 0):
+            for i, batch in enumerate(train_data, 0):
                 # get the inputs; data is a list of [inputs, labels]
-                imagenes, _, generos, _ = data
-                imagenes, generos = imagenes.to(self.device),generos.to(self.device)
+                imagenes, edades, generos, razas = batch
+                imagenes, edades, generos, razas = imagenes.to(self.device),edades.to(self.device),generos.to(self.device),razas.to(self.device)
 
                 # zero the parameter gradients
-                self.optimizador.zero_grad()
+                self.optimizadorEdad.zero_grad()
+                self.optimizadorEdad.zero_grad()
+                self.optimizadorEdad.zero_grad()
 
                 # forward + backward + optimize
-                generosPred = self.modelo(imagenes)
+                edadesPred = self.modeloEdad(imagenes)
+                generosPred = self.modeloGenero(imagenes)
+                razasPred = self.modeloRaza(imagenes)
         
-                lossGenero = self.criterio(generosPred,generos)
+                #Calculamos error
+                lossEdad= self.criterioEdad(edadesPred.squeeze(),edades)
+                lossGenero = self.criterioGenero(generosPred,generos)
+                lossRaza = self.criterioRaza(razasPred,razas)
        
+                #Edad
+                lossEdad.backward()
+                self.optimizadorEdad.step()
+
+                #Genero
                 lossGenero.backward()
-                self.optimizador.step()
+                self.optimizadorGenero.step()
+
+                #Raza
+                lossRaza.backward()
+                self.optimizadorRaza.step()
 
                 # print statistics  
-                running_loss += lossGenero.item()
-                if i % 1000 == 0:    # print every 2000 mini-batches
-                    print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 1000:.3f}')
-                    running_loss = 0.0
+                running_loss_edad += lossEdad.item()
+                running_loss_genero += lossGenero.item()
+                running_loss_raza += lossRaza.item()
 
 
+            print(f'[{epoch + 1}, edad] loss: {running_loss_edad / len(train_data)*4:.3f}')
+            print(f'[{epoch + 1}, genero] loss: {running_loss_genero / len(train_data)*4:.3f}')
+            print(f'[{epoch + 1}, raza] loss: {running_loss_raza / len(train_data)*4:.3f}')
+    
+
+        torch.save(self.modeloEdad.state_dict(), './DWEdad.pth')
+        torch.save(self.modeloGenero.state_dict(), './DWEdad.pth')
+        torch.save(self.modeloRaza.state_dict(), './DWEdad.pth')
         print('Finished Training')
     
