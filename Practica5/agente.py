@@ -93,9 +93,5 @@ class Agente:
             print(f'[{epoch + 1}, genero] loss: {running_loss_genero / len(train_data)*4:.3f}')
             print(f'[{epoch + 1}, raza] loss: {running_loss_raza / len(train_data)*4:.3f}')
     
-
-        torch.save(self.modeloEdad.state_dict(), './DWEdad.pth')
-        torch.save(self.modeloGenero.state_dict(), './DWEdad.pth')
-        torch.save(self.modeloRaza.state_dict(), './DWEdad.pth')
         print('Finished Training')
     
