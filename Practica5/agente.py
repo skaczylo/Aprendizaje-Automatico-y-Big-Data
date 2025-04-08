@@ -17,7 +17,6 @@ Ademas contiene los metodos:
 - entrenarModelo : entrena el modelo
 """
 
-
 class Agente:
 
     def __init__(self,modeloEdad,modeloGenero, modeloRaza, criterioEdad, criterioGenero, criterioRaza, device, epochs,lr):
@@ -28,70 +27,111 @@ class Agente:
         self.lr = lr
 
         #Modelo edad
-        self.modeloEdad= modeloEdad #Red neuronal para la edad
+        self.modeloEdad= modeloEdad.to(device) #Red neuronal para la edad
         self.criterioEdad = criterioEdad
         self.optimizadorEdad = optim.Adam(self.modeloEdad.parameters(), lr=self.lr )
 
         #Modelo  genero
-        self.modeloGenero= modeloGenero #Red neuronal para la edad
+        self.modeloGenero= modeloGenero.to(device) #Red neuronal para la edad
         self.criterioGenero = criterioGenero
         self.optimizadorGenero = optim.Adam(self.modeloGenero.parameters(), lr=self.lr )
 
         #Modelo raza
-        self.modeloRaza= modeloRaza #Red neuronal para la edad
+        self.modeloRaza= modeloRaza.to(device) #Red neuronal para la edad
         self.criterioRaza = criterioRaza
         self.optimizadorRaza = optim.Adam(self.modeloRaza.parameters(), lr=self.lr )
         
 
-    def entrenarAgente(self,train_data):
+    def entrenarEdad(self,train_data,num_epochs):
 
-        for epoch in range(self.epochs):  # loop over the dataset multiple times
+        for epoch in range(num_epochs):  # loop over the dataset multiple times
 
-            running_loss_edad = 0.0
-            running_loss_genero = 0.0
-            running_loss_raza = 0.0
-
+            running_loss = 0.0
+         
             for i, batch in enumerate(train_data, 0):
                 # get the inputs; data is a list of [inputs, labels]
-                imagenes, edades, generos, razas = batch
-                imagenes, edades, generos, razas = imagenes.to(self.device),edades.to(self.device),generos.to(self.device),razas.to(self.device)
+                imagenes, edades, _, _ = batch
+                imagenes, edades = imagenes.to(self.device),edades.to(self.device)
 
                 # zero the parameter gradients
                 self.optimizadorEdad.zero_grad()
-                self.optimizadorEdad.zero_grad()
-                self.optimizadorEdad.zero_grad()
-
+               
                 # forward + backward + optimize
                 edadesPred = self.modeloEdad(imagenes)
-                generosPred = self.modeloGenero(imagenes)
-                razasPred = self.modeloRaza(imagenes)
-        
+             
                 #Calculamos error
                 lossEdad= self.criterioEdad(edadesPred.squeeze(),edades)
-                lossGenero = self.criterioGenero(generosPred,generos)
-                lossRaza = self.criterioRaza(razasPred,razas)
-       
+
                 #Edad
                 lossEdad.backward()
                 self.optimizadorEdad.step()
 
+                # print statistics  
+                running_loss += lossEdad.item()
+             
+            print(f'[{epoch + 1}, edad] loss: {running_loss / len(train_data)*4:.3f}')
+        
+        print('Finished Training')
+
+
+    def entrenarGenero(self,train_data):
+
+        for epoch in range(self.epochs):  # loop over the dataset multiple times
+
+            running_loss = 0.0
+         
+            for i, batch in enumerate(train_data, 0):
+                # get the inputs; data is a list of [inputs, labels]
+                imagenes, _, generos, _ = batch
+                imagenes, generos = imagenes.to(self.device),generos.to(self.device)
+
+                # zero the parameter gradients
+                self.optimizadorGenero.zero_grad()
+               
+                # forward + backward + optimize
+                generosPred = self.modeloGenero(imagenes)
+                #Calculamos error
+                lossGenero = self.criterioGenero(generosPred,generos)
+               
                 #Genero
                 lossGenero.backward()
-                self.optimizadorGenero.step()
+                self.optimizadorGenero.step() 
 
-                #Raza
+                running_loss += lossGenero.item()
+              
+            print(f'[{epoch + 1},genero] loss: {running_loss / len(train_data)*4:.3f}')
+    
+        print('Finished Training')
+
+
+
+    def entrenarRaza(self,train_data):
+
+        for epoch in range(self.epochs):  # loop over the dataset multiple times
+
+            running_loss = 0.0
+         
+            for i, batch in enumerate(train_data, 0):
+                # get the inputs; data is a list of [inputs, labels]
+                imagenes, _, _, razas = batch
+                imagenes, razas = imagenes.to(self.device),razas.to(self.device)
+
+                # zero the parameter gradients
+                self.optimizadorRaza.zero_grad()
+               
+
+                # forward + backward + optimize
+                razasPred = self.modeloRaza(imagenes)
+                #Calculamos error
+                lossRaza = self.criterioRaza(razasPred,razas)
+               
+                #Genero
                 lossRaza.backward()
-                self.optimizadorRaza.step()
+                self.optimizadorRaza.step() 
 
-                # print statistics  
-                running_loss_edad += lossEdad.item()
-                running_loss_genero += lossGenero.item()
-                running_loss_raza += lossRaza.item()
-
-
-            print(f'[{epoch + 1}, edad] loss: {running_loss_edad / len(train_data)*4:.3f}')
-            print(f'[{epoch + 1}, genero] loss: {running_loss_genero / len(train_data)*4:.3f}')
-            print(f'[{epoch + 1}, raza] loss: {running_loss_raza / len(train_data)*4:.3f}')
+                running_loss += lossRaza.item()
+              
+            print(f'[{epoch + 1},raza] loss: {running_loss / len(train_data)*4:.3f}')
     
         print('Finished Training')
     
