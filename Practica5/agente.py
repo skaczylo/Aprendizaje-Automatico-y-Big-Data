@@ -19,6 +19,7 @@ Ademas contiene los metodos:
 
 class Agente:
 
+
     def __init__(self,modeloEdad,modeloGenero, modeloRaza, criterioEdad, criterioGenero, criterioRaza, device, epochs,lr):
 
         #Datos principales
@@ -41,97 +42,76 @@ class Agente:
         self.criterioRaza = criterioRaza
         self.optimizadorRaza = optim.Adam(self.modeloRaza.parameters(), lr=self.lr )
         
+        
+    def entrenarModelo(self, train_data, tarea, num_epochs):
 
-    def entrenarEdad(self,train_data,num_epochs):
+        #Mapeamos el modelo, optimizador y criterio segun la tarea
+        modelo = getattr(self, f'modelo{tarea.capitalize()}')
+        optimizador = getattr(self, f'optimizador{tarea.capitalize()}')
+        criterio = getattr(self, f'criterio{tarea.capitalize()}')
 
-        for epoch in range(num_epochs):  # loop over the dataset multiple times
+        # Selector de etiquetas según la tarea
+        idx_etiqueta = {"Edad": 1, "Genero": 2, "Raza": 3}[tarea.capitalize()]
 
+        for epoch in range(num_epochs):
             running_loss = 0.0
-         
-            for i, batch in enumerate(train_data, 0):
-                # get the inputs; data is a list of [inputs, labels]
-                imagenes, edades, _, _ = batch
-                imagenes, edades = imagenes.to(self.device),edades.to(self.device)
 
-                # zero the parameter gradients
-                self.optimizadorEdad.zero_grad()
-               
-                # forward + backward + optimize
-                edadesPred = self.modeloEdad(imagenes)
-             
-                #Calculamos error
-                lossEdad= self.criterioEdad(edadesPred.squeeze(),edades)
+            for batch in train_data:
+                imagenes = batch[0].to(self.device)
+                etiquetas = batch[idx_etiqueta].to(self.device)
+
+                optimizador.zero_grad()
+                predicciones = modelo(imagenes)
+
+                if tarea.lower() == "edad":
+                    predicciones = predicciones.squeeze()
+
+                loss = criterio(predicciones, etiquetas)
+                loss.backward()
+                optimizador.step()
+
+                running_loss += loss.item()
+            print(f'[{epoch + 1}, edad] loss: {running_loss / len(train_data)*4:.3f}')
+ 
+
+        print(f"Finished Training {tarea}")
+
+
+    def resultados(self,datos):
+        generosTotal = torch.tensor([]).to(self.device)
+        generosPredTotal = torch.tensor([]).to(self.device)
+
+        edadesTotal = torch.tensor([]).to(self.device)
+        edadesPredTotal = torch.tensor([]).to(self.device)
+
+        razasTotal = torch.tensor([]).to(self.device)
+        razasPredTotal = torch.tensor([]).to(self.device)
+
+        with torch.no_grad():
+            for batch in datos:
+
+                imagenes,edades,generos,razas = batch
+                imagenes, edades, generos,razas = imagenes.to(self.device),edades.to(self.device),generos.to(self.device),razas.to(self.device)
+
+                #Genero
+                generosPred = self.modeloGenero(imagenes)
+                _, generosPred = torch.max(generosPred, 1)
+
+                generosPredTotal =torch.cat((generosPredTotal,generosPred),dim = 0)
+                generosTotal = torch.cat((generosTotal,generos),dim = 0)
 
                 #Edad
-                lossEdad.backward()
-                self.optimizadorEdad.step()
-
-                # print statistics  
-                running_loss += lossEdad.item()
-             
-            print(f'[{epoch + 1}, edad] loss: {running_loss / len(train_data)*4:.3f}')
-        
-        print('Finished Training')
+                edadesPred = self.modeloEdad(imagenes)
+                edadesPredTotal = torch.cat((edadesPredTotal,edadesPred.squeeze().int()),dim = 0)
+                edadesTotal = torch.cat((edadesTotal,edades), dim = 0)
 
 
-    def entrenarGenero(self,train_data):
-
-        for epoch in range(self.epochs):  # loop over the dataset multiple times
-
-            running_loss = 0.0
-         
-            for i, batch in enumerate(train_data, 0):
-                # get the inputs; data is a list of [inputs, labels]
-                imagenes, _, generos, _ = batch
-                imagenes, generos = imagenes.to(self.device),generos.to(self.device)
-
-                # zero the parameter gradients
-                self.optimizadorGenero.zero_grad()
-               
-                # forward + backward + optimize
-                generosPred = self.modeloGenero(imagenes)
-                #Calculamos error
-                lossGenero = self.criterioGenero(generosPred,generos)
-               
-                #Genero
-                lossGenero.backward()
-                self.optimizadorGenero.step() 
-
-                running_loss += lossGenero.item()
-              
-            print(f'[{epoch + 1},genero] loss: {running_loss / len(train_data)*4:.3f}')
-    
-        print('Finished Training')
-
-
-
-    def entrenarRaza(self,train_data):
-
-        for epoch in range(self.epochs):  # loop over the dataset multiple times
-
-            running_loss = 0.0
-         
-            for i, batch in enumerate(train_data, 0):
-                # get the inputs; data is a list of [inputs, labels]
-                imagenes, _, _, razas = batch
-                imagenes, razas = imagenes.to(self.device),razas.to(self.device)
-
-                # zero the parameter gradients
-                self.optimizadorRaza.zero_grad()
-               
-
-                # forward + backward + optimize
+                #Raza
                 razasPred = self.modeloRaza(imagenes)
-                #Calculamos error
-                lossRaza = self.criterioRaza(razasPred,razas)
-               
-                #Genero
-                lossRaza.backward()
-                self.optimizadorRaza.step() 
+                _, razasPred = torch.max(razasPred, 1)
+        
+                razasPredTotal =torch.cat((razasPredTotal,razasPred),dim = 0)
+                razasTotal = torch.cat((razasTotal,razas),dim = 0)
 
-                running_loss += lossRaza.item()
-              
-            print(f'[{epoch + 1},raza] loss: {running_loss / len(train_data)*4:.3f}')
-    
-        print('Finished Training')
+        return edadesTotal,edadesPredTotal,generosTotal,generosPredTotal,razasTotal,razasPredTotal
     
