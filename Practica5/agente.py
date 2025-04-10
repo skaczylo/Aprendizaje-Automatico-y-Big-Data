@@ -2,6 +2,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 import torch
 import torch.optim as optim
+import numpy as np
 
 """
 Esta clase contiene 3 modelos uno para cada atributo y entrena los 3 modelos a la vez para optimizar el tiempo
@@ -20,11 +21,10 @@ Ademas contiene los metodos:
 class Agente:
 
 
-    def __init__(self,modeloEdad,modeloGenero, modeloRaza, criterioEdad, criterioGenero, criterioRaza, device, epochs,lr):
+    def __init__(self,modeloEdad,modeloGenero, modeloRaza, criterioEdad, criterioGenero, criterioRaza, device,lr):
 
         #Datos principales
         self.device = device #CPU o GPU depende del ordenador
-        self.epochs = epochs
         self.lr = lr
 
         #Modelo edad
@@ -42,8 +42,17 @@ class Agente:
         self.criterioRaza = criterioRaza
         self.optimizadorRaza = optim.Adam(self.modeloRaza.parameters(), lr=self.lr )
         
-        
-    def entrenarModelo(self, train_data, tarea, num_epochs):
+
+    def entrenarModelo(self, train_data,test_data,tarea, num_epochs):
+
+        """
+        Funcion que entrena el modelo segun la tarea especifica: Edad, Genero o Raza
+        Además calcula el error (loss) y la tasa de aciertos(accuracy) con dos conjuntos:
+            - Conjunto de entrenamiento
+            - Conjunto test mediante la funcion validacion (con este conjunto NO entrena; solo predice resultados)
+        Para que no ralentize el entrenamiento la validadcion se realiza cada 5 epochs
+        Esto será util para hacer gráficas y ver si el modelo esta sobreaprendiendo o no
+        """
 
         #Mapeamos el modelo, optimizador y criterio segun la tarea
         modelo = getattr(self, f'modelo{tarea.capitalize()}')
@@ -53,8 +62,16 @@ class Agente:
         # Selector de etiquetas según la tarea
         idx_etiqueta = {"Edad": 1, "Genero": 2, "Raza": 3}[tarea.capitalize()]
 
+        train_loss = []
+        train_accuracy = []
+
+        test_loss = []
+        test_accuracy = []
+
+        #Comienza entrenamiento
         for epoch in range(num_epochs):
             running_loss = 0.0
+            running_accuracy  = 0.0
 
             for batch in train_data:
                 imagenes = batch[0].to(self.device)
@@ -70,14 +87,91 @@ class Agente:
                 loss.backward()
                 optimizador.step()
 
+                #Datos evolucion entrenamiento
                 running_loss += loss.item()
-            print(f'[{epoch + 1}, edad] loss: {running_loss / len(train_data)*4:.3f}')
- 
+                
+                if tarea.lower() != "edad": 
+                    _, predicciones = torch.max(predicciones, 1)
+                    
+                running_accuracy += (predicciones == etiquetas).sum().item()
+            
+            #Fin de epoch: Mostramos el avance
+            running_loss = running_loss / (len(train_data)*train_data.batch_size)
+            running_accuracy = running_accuracy / (len(train_data)*train_data.batch_size)
+    
+            print(f'[{epoch + 1}, {tarea}] loss: {running_loss :.3f}')
+            print(f'[{epoch + 1}, {tarea}] accuracy: {running_accuracy:.3f}')
+
+            #Actualizamos informacion
+            train_loss.append(running_loss)
+            train_accuracy.append(running_accuracy)
+            #Validacion
+            if epoch % 5 == 0 or epoch == num_epochs-1: #Cada 5 epochs vemos como se comporta el modelo con el conjunto de test
+                running_test_loss, running_test_accuracy = self.validarModelo(test_data,tarea)
+                test_loss.append(running_test_loss)
+                test_accuracy.append(running_test_accuracy)
+           
 
         print(f"Finished Training {tarea}")
+        return train_loss, train_accuracy,test_loss,test_accuracy
+
+
+    def validarModelo(self, test_data,tarea):
+        
+        """
+        Funcion que se encarga de validar el conjunto de test, es decir, ver como se comporta la red neuronal en determinado
+        momento calculando el error (loss) y la tasa de aciertos (accuracy)
+        """
+
+        modelo = getattr(self, f'modelo{tarea.capitalize()}')
+        criterio = getattr(self, f'criterio{tarea.capitalize()}')
+
+        # Selector de etiquetas según la tarea
+        idx_etiqueta = {"Edad": 1, "Genero": 2, "Raza": 3}[tarea.capitalize()]
+
+        
+        running_loss = 0.0
+        running_accuracy = 0.0
+
+        with torch.no_grad():  #Con esto nos aseguramos de que no entrene el modelo
+            
+            for batch in test_data:
+                
+                #Extraemos los datos del batch
+                imagenes = batch[0].to(self.device)
+                etiquetas = batch[idx_etiqueta].to(self.device)
+
+                #Pasamos las imagenes por el modelo
+                predicciones = modelo(imagenes)
+
+                if tarea.lower() == "edad":
+                    predicciones = predicciones.squeeze()
+
+                loss = criterio(predicciones, etiquetas)
+
+                #Datos evolucion entrenamiento
+                running_loss += loss.item()
+                
+                if tarea.lower() != "edad": 
+                    _, predicciones = torch.max(predicciones, 1)
+                    
+                running_accuracy += (predicciones == etiquetas).sum().item()
+
+
+            running_loss = running_loss / (len(test_data)*test_data.batch_size)
+            running_accuracy = running_accuracy / (len(test_data)*test_data.batch_size)
+        
+        return running_loss,running_accuracy
+
 
 
     def resultados(self,datos):
+
+        """
+        Esta funcion, dado un conjunto de datos, recopila las etiqueta reales Genero, Edad y  Raza (generosTotal, edadesTotal,razasTotal)
+        y las etiquetas que predecin los respectivos nmodelos (generosPredTotal,edadesPredTotal,razasPredTotal)
+        De esta forma luego será mas facil, usando las libreria de SckitLearn, calcular métricas resultantes 
+        """
         generosTotal = torch.tensor([]).to(self.device)
         generosPredTotal = torch.tensor([]).to(self.device)
 
@@ -113,5 +207,7 @@ class Agente:
                 razasPredTotal =torch.cat((razasPredTotal,razasPred),dim = 0)
                 razasTotal = torch.cat((razasTotal,razas),dim = 0)
 
-        return edadesTotal,edadesPredTotal,generosTotal,generosPredTotal,razasTotal,razasPredTotal
+        return edadesTotal.to("cpu"),edadesPredTotal.to("cpu"),generosTotal.to("cpu"),generosPredTotal.to("cpu"),razasTotal.to("cpu"),razasPredTotal.to("cpu")
     
+
+
