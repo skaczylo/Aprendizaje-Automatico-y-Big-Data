@@ -92,6 +92,8 @@ class Agente:
                 
                 if tarea.lower() != "edad": 
                     _, predicciones = torch.max(predicciones, 1)
+                else:
+                    predicciones = predicciones.int()
                     
                 running_accuracy += (predicciones == etiquetas).sum().item()
             
@@ -133,7 +135,7 @@ class Agente:
         running_loss = 0.0
         running_accuracy = 0.0
 
-        with torch.no_grad():  #Con esto nos aseguramos de que no entrene el modelo
+        with torch.no_grad():  #Con esto nos aseguramos de que NO entrene el modelo
             
             for batch in test_data:
                 
@@ -146,6 +148,7 @@ class Agente:
 
                 if tarea.lower() == "edad":
                     predicciones = predicciones.squeeze()
+    
 
                 loss = criterio(predicciones, etiquetas)
 
@@ -154,6 +157,8 @@ class Agente:
                 
                 if tarea.lower() != "edad": 
                     _, predicciones = torch.max(predicciones, 1)
+                else:
+                    predicciones = predicciones.int()
                     
                 running_accuracy += (predicciones == etiquetas).sum().item()
 
