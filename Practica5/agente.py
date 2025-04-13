@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 import torch
 import torch.optim as optim
 import numpy as np
+import matplotlib as plt
 
 """
 Esta clase contiene 3 modelos uno para cada atributo y entrena los 3 modelos a la vez para optimizar el tiempo
@@ -17,6 +18,7 @@ Ademas contiene los metodos:
 - entrenamientoTest = divide el dataset en entrenamiento y test
 - entrenarModelo : entrena el modelo
 """
+
 
 class Agente:
 
@@ -112,7 +114,7 @@ class Agente:
                 running_test_loss, running_test_accuracy = self.validarModelo(test_data,tarea)
                 test_loss.append(running_test_loss)
                 test_accuracy.append(running_test_accuracy)
-           
+        
 
         print(f"Finished Training {tarea}")
         return train_loss, train_accuracy,test_loss,test_accuracy
