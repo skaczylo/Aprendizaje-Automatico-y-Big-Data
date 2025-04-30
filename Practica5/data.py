@@ -8,9 +8,10 @@ from torch.utils.data import DataLoader
 import torchvision
 import matplotlib.pyplot as plt
 import numpy as np
-
-
-
+from sklearn.neighbors import KNeighborsClassifier
+import joblib
+from sklearn.model_selection import cross_val_score
+from sklearn.metrics import root_mean_squared_error
 
 """
 Esta clase sirve para tratar las imagenes de manera mas optima con la biblioteca pytorch
@@ -59,6 +60,8 @@ class ImgDataset(Dataset):
           etiqueta = self.target_transform(etiqueta)  # Aplicar transformaciones a la etiqueta (opcional)
 
         return imagen, age,gender,race
+    
+    
 
 """
 funcion que muestra las imagenes
@@ -110,4 +113,25 @@ def entrenamientoTest(dataset,test_size = 0.2,batch_size = 4):
     test_dataloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
 
     return train_dataloader,test_dataloader
-       
+
+
+
+def guardar_modelo(modelo, nombre_archivo):
+    joblib.dump(modelo, nombre_archivo)
+    print(f"Modelo guardado en {nombre_archivo}")
+
+def recuperar_modelo(nombre_archivo):
+    try:
+        # Cargar el modelo desde el archivo
+        modelo = joblib.load(nombre_archivo)
+        print(f"Modelo cargado desde {nombre_archivo}")
+        return modelo
+    except Exception as e:
+        print(f"Error al cargar el modelo desde {nombre_archivo}: {e}")
+        return None
+
+
+
+
+
+

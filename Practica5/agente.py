@@ -4,6 +4,7 @@ import torch
 import torch.optim as optim
 import numpy as np
 import matplotlib as plt
+from torchvision.transforms import ToPILImage
 
 """
 Esta clase contiene 3 modelos uno para cada atributo y entrena los 3 modelos a la vez para optimizar el tiempo
@@ -216,5 +217,6 @@ class Agente:
 
         return edadesTotal.to("cpu"),edadesPredTotal.to("cpu"),generosTotal.to("cpu"),generosPredTotal.to("cpu"),razasTotal.to("cpu"),razasPredTotal.to("cpu")
     
+
 
 
