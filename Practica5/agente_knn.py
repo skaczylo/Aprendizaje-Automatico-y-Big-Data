@@ -4,7 +4,6 @@ import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import root_mean_squared_error
-from data import ImgDataset
 from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 import random
@@ -13,119 +12,8 @@ from sklearn.model_selection import cross_val_score
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
 import lime 
-class ImgDatasetAux(ImgDataset):
-    def __init__(self, img_dir, transform=None, target_transform=None):
-        super().__init__(img_dir, transform, target_transform)  # Llamar al constructor de la clase base
+import data
 
-    def __getitem__(self, idx):
-        # Obtener los datos originales de la clase base
-        imagen, edad, genero, raza = super().__getitem__(idx)
-        
-        # Clasificar la edad utilizando la función clasificar_edad
-        edad_clasificada = clasificar_edad(edad.item())  # Convertir el tensor a número y clasificar
-
-        # Devolver la imagen y las etiquetas modificadas
-        return imagen, edad_clasificada, genero, raza
-    
-def clasificar_edad(edad):
-    """
-    Clasifica la edad en uno de los 10 grupos de acuerdo con el rango de edad.
-    """
-    if 0 <= edad <= 9:
-        return 0
-    elif 10 <= edad <= 19:
-        return 1
-    elif 20 <= edad <= 29:
-        return 2
-    elif 30 <= edad <= 39:
-        return 3
-    elif 40 <= edad <= 49:
-        return 4
-    elif 50 <= edad <= 59:
-        return 5
-    elif 60 <= edad <= 69:
-        return 6
-    elif 70 <= edad <= 79:
-        return 7
-    elif 80 <= edad <= 89:
-        return 8
-    elif 90 <= edad:
-        return 9
-    else:
-        raise ValueError("Edad fuera de los límites permitidos (0-100)")
-    
-
-def entrenar_knn(dataloader, etiqueta, n_neighbors):
-    knn = KNeighborsClassifier(n_neighbors=n_neighbors)
-
-    if etiqueta not in ["raza", "edad", "genero"]:
-        raise ValueError("Etiqueta debe ser 'raza', 'edad' o 'genero'")
-    
-    X_total = []
-    y_total = []
-
-    for imagenes, edades, generos, razas in dataloader:
-        imagenes_flat = imagenes.view(imagenes.size(0), -1).cpu().numpy()
-        
-        if etiqueta == "raza":
-            etiquetas = razas.cpu().numpy()
-        elif etiqueta == "edad":
-            etiquetas = edades.cpu().numpy()
-        elif etiqueta == "genero":
-            etiquetas = generos.cpu().numpy()
-        
-        X_total.append(imagenes_flat)
-        y_total.append(etiquetas)
-
-    # Concatenar todos los mini-lotes
-    X_total = np.concatenate(X_total, axis=0)
-    y_total = np.concatenate(y_total, axis=0)
-
-    # Entrenar una única vez con todo
-    knn.fit(X_total, y_total)
-
-    return knn
-
-def extraer_subconjunto(dataloader, num_imagenes=500, categoria="raza"):
-    """
-    Extrae un subconjunto de imágenes y sus etiquetas de una categoría específica.
-    
-    Args:
-    dataloader (DataLoader): El DataLoader con el conjunto de datos.
-    num_imagenes (int): El número máximo de imágenes a extraer.
-    categoria (str): La categoría para la cual se deben extraer las etiquetas ('raza', 'edad', 'genero').
-    
-    Returns:
-    tuple: Un conjunto de imágenes y sus etiquetas correspondientes a la categoría.
-    """
-    X_train_subset = []  # Para almacenar las características (imágenes aplanadas)
-    y_train_subset = []  # Para almacenar las etiquetas correspondientes a la categoría
-
-    # Iteramos sobre los mini-lotes en el DataLoader
-    for imagenes, edades, generos, razas in dataloader:
-        if len(X_train_subset) >= num_imagenes:  # Si ya tenemos suficientes imágenes, salimos
-            break
-
-        # Aplanamos las imágenes de tamaño (batch_size, 3, 200, 200) a (batch_size, 120000)
-        imagenes_flat = imagenes.view(imagenes.size(0), -1).cpu().numpy()
-
-        # Seleccionamos las etiquetas según la categoría
-        if categoria == "raza":
-            etiquetas = razas.cpu().numpy()
-        elif categoria == "edad":
-            etiquetas = edades.cpu().numpy()
-        elif categoria == "genero":
-            etiquetas = generos.cpu().numpy()
-
-        # Añadir las imágenes y las etiquetas al subconjunto
-        X_train_subset.append(imagenes_flat)
-        y_train_subset.append(etiquetas)
-
-    # Concatenamos todas las imágenes y las etiquetas
-    X_train_subset = np.concatenate(X_train_subset, axis=0)
-    y_train_subset = np.concatenate(y_train_subset, axis=0)
-
-    return X_train_subset, y_train_subset
 
 def establecer_semilla(seed=42):
     random.seed(seed)
@@ -136,12 +24,13 @@ def establecer_semilla(seed=42):
 def encontrar_mejor_k(dataloader, categoria, num_imagenes=500, k_range=range(1, 21)):
 
     establecer_semilla()
+
     # Aseguramos que la categoría sea válida
     if categoria not in ["raza", "edad", "genero"]:
         raise ValueError("La categoría debe ser 'raza', 'edad' o 'genero'")
     
     # Extraer un subconjunto de datos (limitado a 'num_imagenes' imágenes)
-    X_train_subset, y_train_subset = extraer_subconjunto(dataloader, num_imagenes=num_imagenes, categoria=categoria)
+    X_train_subset, y_train_subset = data.cargarDatos(dataloader, num_imagenes=num_imagenes, categoria=categoria)
 
     # Almacenar las puntuaciones para cada valor de k
     mejores_scores = []
@@ -179,61 +68,7 @@ def encontrar_mejor_k(dataloader, categoria, num_imagenes=500, k_range=range(1, 
 
     return mejor_k, mejor_score
 
-from sklearn.metrics import accuracy_score, mean_squared_error, classification_report
 
-def evaluar_modelo(modelo, dataloader, etiqueta="genero"):
-    """
-    Evalúa un modelo de sklearn usando un DataLoader de PyTorch.
-    Calcula precisión (accuracy), RMSE y muestra precision/recall/F1-score.
-
-    Args:
-        modelo: Modelo de sklearn ya entrenado (por ejemplo, KNeighborsClassifier).
-        dataloader: DataLoader que entrega (imagenes, edades, generos, razas).
-        etiqueta: Qué etiqueta usar para evaluación ('raza', 'edad' o 'genero').
-
-    Returns:
-        accuracy: Precisión del modelo en el conjunto de prueba.
-        rmse: Raíz del error cuadrático medio en el conjunto de prueba.
-        report: Reporte de clasificación (precision, recall, f1-score, support).
-        y_test: Etiquetas reales.
-        y_pred: Etiquetas predichas por el modelo.
-    """
-    X_test = []
-    y_test = []
-
-    for imagenes, edades, generos, razas in dataloader:
-        imagenes_flat = imagenes.view(imagenes.size(0), -1).cpu().numpy()
-
-        if etiqueta == "raza":
-            etiquetas = razas.cpu().numpy()
-        elif etiqueta == "edad":
-            etiquetas = edades.cpu().numpy()
-        elif etiqueta == "genero":
-            etiquetas = generos.cpu().numpy()
-        else:
-            raise ValueError("Etiqueta debe ser 'raza', 'edad' o 'genero'")
-
-        X_test.append(imagenes_flat)
-        y_test.append(etiquetas)
-
-    # Concatenar todos los lotes
-    X_test = np.concatenate(X_test, axis=0)
-    y_test = np.concatenate(y_test, axis=0)
-
-    # Predicciones del modelo
-    y_pred = modelo.predict(X_test)
-
-    # Calcular métricas
-    accuracy = accuracy_score(y_test, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    report = classification_report(y_test, y_pred, digits=4)
-
-    print(f"Precisión (accuracy) en el conjunto de prueba: {accuracy:.4f}")
-    print(f"Error cuadrático medio (RMSE) en el conjunto de prueba: {rmse:.4f}")
-    print("\nReporte de clasificación:")
-    print(report)
-
-    return y_test, y_pred
 
 def lime_explain_and_visualize(modelo, imagen, device='cpu', num_samples=1000):
     """

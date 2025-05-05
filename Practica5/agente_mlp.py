@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 import torch.nn.init as init
 import importlib
 import data
-import agente
+import Practica5.agente_cnn as agente_cnn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from itertools import islice
 importlib.reload(data)
-importlib.reload(agente)
+importlib.reload(agente_cnn)
 import agente_knn
 from torch.utils.data import Subset
 from lime import lime_image
@@ -99,11 +99,7 @@ def train_and_evaluate(model, train_loader, test_loader, etiqueta, num_epochs=10
     return train_losses, train_accuracies, test_losses, test_accuracies
 
 
-
-
-from sklearn.metrics import accuracy_score, mean_squared_error, classification_report
-
-def evaluar_mlp(modelo, dataloader, etiqueta="genero", dispositivo="cpu"):
+def evaluar(modelo, dataloader, etiqueta="genero", dispositivo="cpu"):
     """
     Evalúa un modelo MLP de PyTorch usando un DataLoader.
     Calcula precisión (accuracy), RMSE y muestra precision/recall/F1-score.
@@ -153,15 +149,6 @@ def evaluar_mlp(modelo, dataloader, etiqueta="genero", dispositivo="cpu"):
 
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-
-    accuracy = accuracy_score(y_true, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    report = classification_report(y_true, y_pred, digits=4)
-
-    print(f"Precisión (accuracy): {accuracy:.4f}")
-    print(f"RMSE: {rmse:.4f}")
-    print("Reporte de clasificación:")
-    print(report)
 
     return  y_true, y_pred
 

@@ -30,7 +30,7 @@ Devuelve la imagen, el año, el genero y la raza
 
 """
 
-class ImgDataset(Dataset):
+class Dataset(Dataset):
     def __init__(self, img_dir, transform=None, target_transform=None):
         self.img_labels = os.listdir(img_dir) #lista de los nombres de las fotos
         self.img_dir = img_dir #Ruta principal donde estan las imagenes
@@ -57,16 +57,112 @@ class ImgDataset(Dataset):
           imagen = self.transform(imagen)  # Aplicar transformaciones a la imagen
 
         if self.target_transform:
-          etiqueta = self.target_transform(etiqueta)  # Aplicar transformaciones a la etiqueta (opcional)
+          age = torch.tensor(int(self.target_transform(age)))  # Aplicar transformaciones a la edad (opcional)
 
         return imagen, age,gender,race
     
-    
+def entrenamientoTest(dataset,test_size = 0.2,batch_size =4):
+    """
+    entrenamientoTest se encarga de dividir el dataset total en conjunto de entrenamiento y test
+    """
+    #Primero realizamos una division de  indices
+    train_indices, test_indices = train_test_split(range(len(dataset)), test_size=test_size, random_state=42)
 
-"""
-funcion que muestra las imagenes
-""" 
+    #Dividimos los indices
+    train_subset = torch.utils.data.Subset(dataset, train_indices)
+    test_subset = torch.utils.data.Subset(dataset, test_indices)
+
+    # Crear los DataLoaders con los indices que hemos repartidos
+    train_dataloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
+  
+    #Dividimos ambos conjuntos en batches
+    return train_dataloader,test_dataloader
+
+
+def cargarDatos(dataloader, num_imagenes=500, categoria="raza"):
+    """
+    cargarDatos carga las imagenes y sus correspondiente etiqueta en arrays
+    Esta funcion se utiliza para el modelo KNN, pues requiere que previamente los datos esten
+    almacenados en una lista o array
+
+    Args:
+    -dataloader: objeto que permite acceder a las imagenes y sus correspondientes etiquetas
+    -num imagenes: numero de imagenes que se desea cargar del conjunto dataloader
+    - categoria: etiqueta que se desea almacenar 
+    Extrae un subconjunto de imágenes y sus etiquetas de una categoría específica.
+    """
+    X = []  # Para almacenar las características (imágenes aplanadas)
+    Y= []  # Para almacenar las etiquetas correspondientes a la categoría
+
+    # Iteramos sobre los mini-lotes en el DataLoader
+    for imagenes, edades, generos, razas in dataloader:
+        if len(X) >= num_imagenes:  # Si ya tenemos suficientes imágenes, salimos
+            break
+
+        # Aplanamos las imágenes de tamaño (batch_size, 3, 200, 200) a (batch_size, 120000)
+        imagenes_flat = imagenes.view(imagenes.size(0), -1).cpu().numpy()
+
+        # Seleccionamos las etiquetas según la categoría
+        if categoria == "raza":
+            etiquetas = razas.cpu().numpy()
+        elif categoria == "edad":
+            etiquetas = edades.cpu().numpy()
+        elif categoria == "genero":
+            etiquetas = generos.cpu().numpy()
+
+        # Añadir las imágenes y las etiquetas al subconjunto
+        X.append(imagenes_flat)
+        Y.append(etiquetas)
+
+    # Concatenamos todas las imágenes y las etiquetas
+    X = np.concatenate(X, axis=0)
+    Y = np.concatenate(Y, axis=0)
+
+    return X, Y
+
+
+
+def clasificarEdad(edad):
+    return edad//10
+
+
+
+
+def graficaEntrenamiento(train_loss,train_accuracy,test_loss,test_accuracy,epochs,nombre):
+    x1 = np.arange(0,epochs)
+    x2 = np.arange(0,epochs+1,5)
+
+    
+    fig,axs = plt.subplots(1,2)
+
+    #Loss
+    axs[0].plot(x1,train_loss,label = "Train Loss", color = 'b')
+    axs[0].plot(x1,test_loss,label = "Test Loss", color = 'r')
+    axs[0].set_title('Loss')  # Título del primer gráfico
+    axs[0].set_xlabel('Epochs')  # Etiqueta del eje X
+    axs[0].set_ylabel('Loss')  # Etiqueta del eje Y
+    axs[0].legend()
+    axs[0].grid(True)
+
+    #Train
+    axs[1].plot(x1,train_accuracy,label = "Train Accuracy", color = 'b')
+    axs[1].plot(x1,test_accuracy,label = "Test Accuracy", color = 'r')
+    axs[1].set_title('Accuracy')  # Título del primer gráfico
+    axs[1].set_xlabel('Epochs')  # Etiqueta del eje X
+    axs[1].set_ylabel('Acurracy')  # Etiqueta del eje Y
+    axs[1].legend()
+    axs[1].grid(True)
+    
+    plt.grid(True)
+    plt.tight_layout()  # Ajusta el espaciado entre los subgráficos
+    plt.savefig(f'.//Graficas//{nombre}')
+
+
 def mostrarImg(img):
+    """
+    funcion que muestra las imagenes
+    """ 
     img = torchvision.utils.make_grid(img)
     img = img / 2 + 0.5     # unnormalize
     npimg = img.cpu().numpy()
@@ -74,11 +170,12 @@ def mostrarImg(img):
     plt.show()
 
 
-"""
-funcion para hacer pruebas con nuestras fotos
-"""
+
 
 def convertirRedimensionar(imagen_path, output_path):
+    """
+    funcion para hacer pruebas con nuestras fotos
+    """
     # Abrir la imagen
     with Image.open(imagen_path) as img:
         # Si la imagen tiene un canal alfa (transparencia), convertir a RGB
@@ -91,28 +188,11 @@ def convertirRedimensionar(imagen_path, output_path):
         # Guardar la imagen en formato JPG
         img_resized.save(output_path, 'JPEG')
 
-"""
-entrenamientoTest se encarga de dividir el dataset total en conjunto de entrenamiento y test
-"""
 
-def entrenamientoTest(dataset,test_size = 0.2,batch_size = 4):
-       
-    #Primero realizamos una division de  indices
-    train_indices, test_indices = train_test_split(range(len(dataset)), test_size=test_size, random_state=42)
 
-    #Dividimos los indices
-    train_subset = torch.utils.data.Subset(dataset, train_indices)
-    test_subset = torch.utils.data.Subset(dataset, test_indices)
 
-    # Crear los DataLoaders con los indices que hemos repartidos
-    train_dataloader = DataLoader(train_subset, batch_size=4, shuffle=True)
-    test_dataloader = DataLoader(test_subset, batch_size=4, shuffle=False)
 
-    #Dividimos ambos conjuntos en batches
-    train_dataloader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_subset, batch_size=batch_size, shuffle=False)
 
-    return train_dataloader,test_dataloader
 
 
 
