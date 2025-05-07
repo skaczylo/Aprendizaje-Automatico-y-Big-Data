@@ -5,13 +5,11 @@ import matplotlib.pyplot as plt
 import torch.nn.init as init
 import importlib
 import data
-import Practica5.agente_cnn as agente_cnn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from itertools import islice
-importlib.reload(data)
-importlib.reload(agente_cnn)
+import agente_cnn
 import agente_knn
 from torch.utils.data import Subset
 from lime import lime_image
