@@ -11,7 +11,7 @@ import torch
 from sklearn.model_selection import cross_val_score
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
-import lime 
+from torchvision import transforms
 import data
 
 
@@ -67,6 +67,26 @@ def encontrar_mejor_k(dataloader, categoria, num_imagenes=500, k_range=range(1, 
     plt.show()
 
     return mejor_k, mejor_score
+
+
+
+def entrenar_modelo_knn(path, categoria="genero", n_neighbors=9, test_size=0.2, batch_size=1):
+    # Definimos la transformación para las imágenes
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    
+    # Creamos el dataset y los dataloaders
+    dataset = data.Dataset(path, transform=transform,target_transform=data.clasificarEdad)  # Pasamos las imagenes a la estructura de datos
+    train_dataloader, _ = data.entrenamientoTest(dataset=dataset, test_size=0.2, batch_size=1)
+    
+    # Cargamos los datos de entrenamiento
+    X_train, Y_train = data.cargarDatos(train_dataloader, num_imagenes=len(train_dataloader), categoria=categoria)  
+    
+    # Entrenamos el modelo KNN
+    modelo= KNeighborsClassifier(n_neighbors=n_neighbors)
+    modelo.fit(X_train, Y_train)
+    
+    return modelo
+
 
 
 
